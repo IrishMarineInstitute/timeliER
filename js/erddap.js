@@ -3,10 +3,10 @@
           "(T([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]+))?)?" +
           "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?";
       var d = string.match(new RegExp(regexp));
-  
+
       var offset = 0;
       var date = new Date(d[1], 0, 1);
-  
+
       if (d[3]) { date.setMonth(d[3] - 1); }
       if (d[5]) { date.setDate(d[5]); }
       if (d[7]) { date.setHours(d[7]); }
@@ -17,7 +17,7 @@
           offset = (Number(d[16]) * 60) + Number(d[17]);
           offset *= ((d[15] == '-') ? 1 : -1);
       }
-  
+
       offset -= date.getTimezoneOffset();
       time = (Number(date) + (offset * 60 * 1000));
       this.setTime(Number(time));
@@ -59,8 +59,8 @@ var timeliER = function(elid,erddap){
       timeDimensionOptions: {
           times: times,
       },
-      timeDimensionControlOptions: {    
-          playerOptions: {                        
+      timeDimensionControlOptions: {
+          playerOptions: {
               loop: true,
               transitionTime: 400,
               buffer: 10
@@ -100,9 +100,9 @@ var timeliER = function(elid,erddap){
         useDMS: false,
         enableUserInput: false
     }).addTo(map);
-    
+
     var legend = L.control({position: 'bottomright'});
-    
+
     legend.onAdd = function (map) {
           var el = document.getElementById("erddapLegend");
           if(el){
@@ -113,14 +113,14 @@ var timeliER = function(elid,erddap){
   	  return div;
     };
     legend.addTo(map);
-   }  
+   }
 
-  
+
   /*
   var conn3VelocityLayer = L.tileLayer.wms( "http://erddap3.marine.ie/erddap/wms/"+dataset+"/request", {
       layers: dataset+':vectors[sea_water_x_velocity|sea_water_y_velocity]',
       format: 'image/png',
-      transparent: true,    
+      transparent: true,
       crs: L.CRS.EPSG4326,
       erddap:{
           url: erddap,
@@ -130,8 +130,8 @@ var timeliER = function(elid,erddap){
       },
   });
   */
-  
-  
+
+
   var addTimeDimensionLayer = function(layer, name, addToMap){
       var timeDimensionLayer = L.timeDimension.layer.wms(layer, {});
       //layersControl.addOverlay(timeDimensionLayer, name);
@@ -163,7 +163,7 @@ var timeliER = function(elid,erddap){
       }).bind(null,layer));
   }
   var mapLatLngBounds = null;
-  
+
   var rows2oo = function(data){
     var info = {};
     var rows = data["table"]["rows"];
@@ -177,7 +177,7 @@ var timeliER = function(elid,erddap){
       info[rows[i][0]][rows[i][1]][rows[i][2]] = {type: rows[i][3], value: rows[i][4]};
     }
     return info;
-  
+
   };
   var table2array = function(data){
     var answer = [];
@@ -249,7 +249,7 @@ var timeliER = function(elid,erddap){
       var attrs = Object.keys(info.attribute);
       var layers = [];
       for(var i=0;i<attrs.length;i++){
-     
+
         var attribute = attrs[i];
         if(info.attribute[attribute].colorBarMinimum && info.attribute[attribute].colorBarMaximum){
           var lerddap = {
@@ -258,19 +258,20 @@ var timeliER = function(elid,erddap){
                 attributes: [attribute],
                 times: times
             };
-        
+
           if(info.attribute.NC_GLOBAL.geospatial_vertical_max){
             lerddap.vertical =  info.attribute.NC_GLOBAL.geospatial_vertical_max.value;
           }
-  
+
           var layer = L.tileLayer.wms(wmsUrl, {
             layers: dataset+':'+attribute,
             format: 'image/png',
-            transparent: true,    
+            transparent: true,
             abovemaxcolor: "extend",
             belowmincolor: "extend",
             numcolorbands: 40,
             crs: L.CRS.EPSG4326,
+            opacity: 0.8,
             erddap: lerddap,
           });
           var colorscalerange = info.attribute[attribute].colorBarMinimum.value + "," +
@@ -285,13 +286,13 @@ var timeliER = function(elid,erddap){
               addToMap: layers.length == 0
            });
         }
-  
+
       }
       if(layers.length){
         var nc_global = info.attribute.NC_GLOBAL;
         var bounds = [[parseFloat(nc_global.geospatial_lat_min.value),parseFloat(nc_global.geospatial_lon_min.value)],
                     [parseFloat(nc_global.geospatial_lat_max.value),parseFloat(nc_global.geospatial_lon_max.value)]];
-        
+
         modelref[dataset] = addTimeDimensionLayers.bind(null,layers,nc_global,bounds,times,dataset);
         if(!mapLatLngBounds){
           mapLatLngBounds = L.latLngBounds(bounds);
@@ -308,7 +309,7 @@ var timeliER = function(elid,erddap){
         items.sort(function(a,b){
           var keyA = $(a).text();
           var keyB = $(b).text();
-        
+
           if (keyA < keyB) return -1;
           if (keyA > keyB) return 1;
           return 0;
@@ -350,7 +351,7 @@ var timeliER = function(elid,erddap){
       xhr.send();
    });
   }
-  
+
   $.getJSON(erddap+"/wms/index.json", function(data){
      //console.log(data);
      var info = table2array(data);
@@ -359,7 +360,7 @@ var timeliER = function(elid,erddap){
       addErddapLayer(info[i].Info,info[i].wms,info[i]["Dataset ID"]);
      }
   });
-  
+
   var showPointChart = function(layer,options,e){
       var start_time = options.meta.attribute.NC_GLOBAL.time_coverage_start.value,
           end_time =  options.meta.attribute.NC_GLOBAL.time_coverage_end.value,
@@ -386,7 +387,7 @@ var timeliER = function(elid,erddap){
                href: url,
             },
             title: {
-                text: 'Lon: '+popup.getLatLng().lng.toFixed(3)+' Lat: '+popup.getLatLng().lat.toFixed(3), 
+                text: 'Lon: '+popup.getLatLng().lng.toFixed(3)+' Lat: '+popup.getLatLng().lat.toFixed(3),
             },
             xAxis: {
                 labels: {
@@ -422,7 +423,7 @@ var timeliER = function(elid,erddap){
                 defaultSeriesType: 'spline'
             },
             title: {
-                text: 'Lon: '+popup.getLatLng().lng.toFixed(3)+' Lat: '+popup.getLatLng().lat.toFixed(3), 
+                text: 'Lon: '+popup.getLatLng().lng.toFixed(3)+' Lat: '+popup.getLatLng().lat.toFixed(3),
             },
             credits: {
                text: 'click to download csv',
