@@ -8,7 +8,7 @@
 
 L.TimeDimension = (L.Layer || L.Class).extend({
 
-    includes: L.Mixin.Events,
+    includes: (L.Evented || L.Mixin.Events),
 
     initialize: function (options) {
         L.setOptions(this, options);
@@ -40,6 +40,10 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         return this._currentTimeIndex;
     },
 
+    getInterpolator: function(){
+      return this._interp;
+    },
+
     getCurrentTime: function () {
         var index = -1;
         if (this._loadingTimeIndex !== -1) {
@@ -50,7 +54,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         if (index >= 0) {
             return this._availableTimes[index];
         } else {
-            return 0;
+            return null;
         }
     },
 
@@ -58,7 +62,8 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         return (this._loadingTimeIndex !== -1);
     },
 
-    setCurrentTimeIndex: function (newIndex) {
+    setCurrentTimeIndex: function (newIndex,interp) {
+        this._interp = interp;
         var upperLimit = this._upperLimit || this._availableTimes.length - 1;
         var lowerLimit = this._lowerLimit || 0;
         //clamp the value
@@ -70,7 +75,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         var newTime = this._availableTimes[newIndex];
         //console.log('INIT -- Current time: ' + new Date(newTime).toISOString());
         if (this._checkSyncedLayersReady(this._availableTimes[this._loadingTimeIndex])) {
-            this._newTimeIndexLoaded();
+            this._newTimeIndexLoaded(this._interp);
         } else {
             this.fire('timeloading', {
                 time: newTime
@@ -79,14 +84,14 @@ L.TimeDimension = (L.Layer || L.Class).extend({
             setTimeout((function (index) {
                 if (index == this._loadingTimeIndex) {
                     //console.log('Change time for timeout');
-                    this._newTimeIndexLoaded();
+                    this._newTimeIndexLoaded(this._interp);
                 }
             }).bind(this, newIndex), this._loadingTimeout);
         }
 
     },
 
-    _newTimeIndexLoaded: function () {
+    _newTimeIndexLoaded: function (interp) {
         if (this._loadingTimeIndex === -1) {
             return;
         }
@@ -103,7 +108,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         for (var i = 0, len = this._syncedLayers.length; i < len; i++) {
             if (this._syncedLayers[i].isReady) {
                 if (!this._syncedLayers[i].isReady(time)) {
-                    return false;
+					return false;
                 }
             }
         }
@@ -120,7 +125,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         return this._availableTimes[index];
     },
 
-    nextTime: function (numSteps, loop) {
+    nextTime: function (numSteps, loop, interp) {
         if (!numSteps) {
             numSteps = 1;
         }
@@ -146,7 +151,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
                 newIndex = lowerLimit;
             }
         }
-        this.setCurrentTimeIndex(newIndex);
+        this.setCurrentTimeIndex(newIndex,interp);
     },
 
     prepareNextTimes: function (numSteps, howmany, loop) {
@@ -155,6 +160,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
         }
 
         var newIndex = this._currentTimeIndex;
+        var currentIndex = newIndex;
         if (this._loadingTimeIndex > -1) {
             newIndex = this._loadingTimeIndex;
         }
@@ -182,6 +188,11 @@ L.TimeDimension = (L.Layer || L.Class).extend({
                 } else {
                     break;
                 }
+            }
+            if (currentIndex === newIndex) {
+                //we looped around the timeline
+                //no need to load further, the next times are already loading
+                break;
             }
             this.fire('timeloading', {
                 time: this._availableTimes[newIndex]

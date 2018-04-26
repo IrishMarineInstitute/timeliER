@@ -133,7 +133,7 @@ var timeliER = function(elid,erddap){
 
 
   var addTimeDimensionLayer = function(layer, name, addToMap){
-      var timeDimensionLayer = L.timeDimension.layer.wms(layer, {});
+      var timeDimensionLayer = L.timeDimension.layer.wms(layer, {cache: 15, fadeFrames: 10, interpolate: true});
       //layersControl.addOverlay(timeDimensionLayer, name);
       layersControl.addBaseLayer(timeDimensionLayer, name);
       if (addToMap)

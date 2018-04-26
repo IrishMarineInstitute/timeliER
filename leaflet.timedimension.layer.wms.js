@@ -16,6 +16,10 @@ L.TimeDimension.Layer.WMS = L.TimeDimension.Layer.extend({
         this._updateTimeDimension = this.options.updateTimeDimension || false;
         this._setDefaultTime = this.options.setDefaultTime || false;
         this._updateTimeDimensionMode = this.options.updateTimeDimensionMode || 'intersect'; // 'union' or 'replace'
+        this._fadeFrames = parseFloat(this.options.fadeFrames) || 1;
+        this._fadeInFrames = this.options.fadeInFrames? parseFloat(this.options.fadeInFrames) || this._fadeFrames : this._fadeFrames;
+        this._fadeOutFrames = this.options.fadeInFrames? parseFloat(this.options.fadeInFrames) || this._fadeFrames : this._fadeFrames;
+        this._interpolate = this.options.interpolate || false;
         this._layers = {};
         this._defaultTime = 0;
         this._availableTimes = [];
@@ -89,7 +93,7 @@ L.TimeDimension.Layer.WMS = L.TimeDimension.Layer.extend({
         if (!this._map.hasLayer(layer)) {
             this._map.addLayer(layer);
         } else {
-            this._showLayer(layer, time);
+            this._showLayer(layer, time, this._timeDimension.getInterpolator());
         }
     },
 
@@ -160,20 +164,23 @@ L.TimeDimension.Layer.WMS = L.TimeDimension.Layer.extend({
             }
         }
     },
-    _showLayer: function(layer, time) {
-      layer.show().then(function(){
-        if (this._currentLayer && this._currentLayer !== layer) {
-            this._currentLayer.hide();
+    _showLayer: function(layer, time, interp) {
+      if(!(this._interpolate && interp)){
+        interp = new LtdwGlide(this._fadeInFrames);
+      }
+      layer.show(interp).then(function(oldLayer, newLayer){
+        if (oldLayer && oldLayer !== newLayer) {
+            oldLayer.hide(new LtdwGlide(this._fadeOutFrames));
         }
-        if (this._currentLayer && this._currentLayer === layer) {
-            return;
-        }
-        this._currentLayer = layer;
-        this._currentTime = time;
-        console.log('Show layer ' + layer.wmsParams.layers + ' with time: ' + new Date(time).toISOString());
-
         this._evictCachedTimes(this._timeCacheForward, this._timeCacheBackward);
-      }.bind(this));
+      }.bind(this,this._currentLayer, layer));
+
+      if (this._currentLayer && this._currentLayer === layer) {
+          return;
+      }
+      this._currentLayer = layer;
+      this._currentTime = time;
+      //console.log('Show layer ' + layer.wmsParams.layers + ' with time: ' + new Date(time).toISOString());
     },
 
     _getLayerForTime: function(time) {
@@ -200,7 +207,7 @@ L.TimeDimension.Layer.WMS = L.TimeDimension.Layer.extend({
                 this._layers[time] = layer;
             }
             if (this._timeDimension && time == this._timeDimension.getCurrentTime() && !this._timeDimension.isLoading()) {
-                this._showLayer(layer, time);
+                this._showLayer(layer, time, this._timeDimension.getInterpolator());
             }
             // console.log('Loaded layer ' + layer.wmsParams.layers + ' with time: ' + new Date(time).toISOString());
             this.fire('timeload', {
@@ -236,6 +243,7 @@ L.TimeDimension.Layer.WMS = L.TimeDimension.Layer.extend({
     },
 
     _removeLayers: function(times) {
+      return;
         for (var i = 0, l = times.length; i < l; i++) {
             if (this._map)
                 this._map.removeLayer(this._layers[times[i]]);
@@ -405,25 +413,63 @@ if (!L.NonTiledLayer) {
     L.NonTiledLayer = (L.Layer || L.Class).extend({});
 }
 
-function fadeIn(el, resolve){
-  if(!el){
-    resolve();
-    return;
-  }
-  var targetOpacity = parseFloat(el.style.opacity) || 1;
-  var step = targetOpacity/10;
-  el.style.opacity = 0;
-  el.style.display = "block";
-  (function fade() {
-    var val = parseFloat(el.style.opacity);
-    if ((val += step) <= targetOpacity) {
-      el.style.opacity = val;
-      requestAnimationFrame(fade);
-    }else{
-      el.style.opacity = targetOpacity;
+var LtdwGlide = function(n){
+  this._position = 0.;
+  this._step = 1/n;
+};
+LtdwGlide.prototype.position = function(){
+  this._position += this._step;
+  return this._position > 1? 1: this._position;
+};
+/*
+ * returns a promise to fade out an element using css opacity.
+ */
+function ltdlwFadeOut(el,interp){
+  return new Promise(function(resolve,reject){
+    if(!el){
       resolve();
+      return;
     }
-  })();
+    interp = interp || new LtdwGlide(7);
+    var startOpacity = parseFloat(el.style.opacity);
+    (function fade() {
+      var opacity = startOpacity * (1-interp.position());
+      if(opacity >= 0.1){
+        el.style.opacity = opacity;
+        requestAnimationFrame(fade);
+      }else{
+        el.style.display = 'none';
+        el.style.opacity = startOpacity;
+        resolve();
+      }
+    })();
+  });
+}
+/*
+ * returns a promise to fade in an element using css opacity.
+ */
+function ltdlwFadeIn(el, interp){
+  return new Promise(function(resolve,reject){
+    if(!el){
+      resolve();
+      return;
+    }
+    var targetOpacity = parseFloat(el.style.opacity) || 1;
+    interp = interp || new LtdwGlide(10);
+    el.style.opacity = 0;
+    el.style.display = "block";
+    (function fade() {
+      var position = interp.position();
+      if ( position < 1 ) {
+        el.style.opacity = position * targetOpacity;
+        requestAnimationFrame(fade);
+      }else{
+        el.style.opacity = targetOpacity;
+        resolve();
+      }
+    })();
+  });
+
 }
 
 L.NonTiledLayer.include({
@@ -453,16 +499,17 @@ L.NonTiledLayer.include({
         return this._loaded;
     },
 
-    hide: function() {
-      this._visible = false;
-      this._div.style.display = 'none';
+    hide: function(interp) {
+        return ltdlwFadeOut(this._div,interp).then(
+          function(){
+            this._visible = false;
+        }.bind(this)
+      );
     },
 
-    show: function() {
+    show: function(interp) {
         this._visible = true;
-        return new Promise(function(resolve,reject){
-          fadeIn(this._div,resolve);
-        }.bind(this));
+        return ltdlwFadeIn(this._div,interp);
     },
 
     getURL: function() {
@@ -492,19 +539,17 @@ L.TileLayer.include({
         return this._loaded;
     },
 
-    hide: function() {
-        this._visible = false;
-        if (this._container) {
-            this._container.style.display = 'none';
-        }
-
+    hide: function(interp) {
+        return ltdlwFadeOut(this._container,interp).then(
+          function(){
+            this._visible = false;
+        }.bind(this)
+      );
     },
 
-    show: function() {
+    show: function(interp) {
         this._visible = true;
-        return new Promise(function(resolve,reject){
-          fadeIn(this._container,resolve);
-        }.bind(this));
+        return ltdlwFadeIn(this._container,interp);
     },
 
     getURL: function() {

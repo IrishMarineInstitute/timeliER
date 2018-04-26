@@ -1,14 +1,26 @@
 /*jshint indent: 4, browser:true*/
 /*global L*/
 
-
+/*
+ * L.TimeDimension.Interpolator
+ */
+//'use strict';
+var Interpolator = function(transitionTime,interp){
+    this._start_time = new Date().getTime();
+    this._transitionTime = transitionTime;
+    this._start_position = interp ? interp.position() : 0.;
+};
+Interpolator.prototype.position = function(){
+  var position = (new Date().getTime() - this._start_time) / this._transitionTime;
+  return position > 1? 1.:position;
+}
 /*
  * L.TimeDimension.Player
  */
 //'use strict';
 L.TimeDimension.Player = (L.Layer || L.Class).extend({
 
-    includes: L.Mixin.Events,
+    includes: (L.Evented || L.Mixin.Events),
     initialize: function(options, timeDimension) {
         L.setOptions(this, options);
         this._timeDimension = timeDimension;
@@ -23,6 +35,10 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
             this._waitingForBuffer = false; // reset buffer
         }).bind(this));
         this.setTransitionTime(this.options.transitionTime || 1000);
+
+        this._timeDimension.on('limitschanged availabletimeschanged timeload', (function(data) {
+            this._timeDimension.prepareNextTimes(this._steps, this._minBufferReady, this._loop);
+        }).bind(this));
     },
 
 
@@ -78,14 +94,15 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
             }
         }
         this.pause();
-        this._timeDimension.nextTime(this._steps, this._loop);
+        this._interp = new Interpolator(this._transitionTime);
+        this._timeDimension.nextTime(this._steps, this._loop, this._interp);
         if (buffer > 0) {
             this._timeDimension.prepareNextTimes(this._steps, buffer, this._loop);
         }
     },
-    
+
     _getMaxIndex: function(){
-       return Math.min(this._timeDimension.getAvailableTimes().length - 1, 
+       return Math.min(this._timeDimension.getAvailableTimes().length - 1,
                        this._timeDimension.getUpperLimitIndex() || Infinity);
     },
 
@@ -95,7 +112,7 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
         this._waitingForBuffer = false;
         if (this.options.startOver){
             if (this._timeDimension.getCurrentTimeIndex() === this._getMaxIndex()){
-                 this._timeDimension.setCurrentTimeIndex(this._timeDimension.getLowerLimitIndex() || 0);
+                 this._timeDimension.setCurrentTimeIndex(this._timeDimension.getLowerLimitIndex() || 0, this._interp);
             }
         }
         this.release();
@@ -111,6 +128,7 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
         if (!this._intervalID) return;
         clearInterval(this._intervalID);
         this._intervalID = null;
+        this._waitingForBuffer = false;
         this.fire('stop');
     },
 
@@ -154,7 +172,7 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
         }
         if (this._intervalID) {
             this.stop();
-            this.start();
+            this.start(this._steps);
         }
         this.fire('speedchange', {
             transitionTime: transitionTime,
