@@ -5,12 +5,12 @@
  * L.TimeDimension.Interpolator
  */
 //'use strict';
-var Interpolator = function(transitionTime,interp){
+var LtdInterpolator = function(transitionTime,interp){
     this._start_time = new Date().getTime();
     this._transitionTime = transitionTime;
     this._start_position = interp ? interp.position() : 0.;
 };
-Interpolator.prototype.position = function(){
+LtdInterpolator.prototype.position = function(){
   var position = (new Date().getTime() - this._start_time) / this._transitionTime;
   return position > 1? 1.:position;
 }
@@ -94,7 +94,7 @@ L.TimeDimension.Player = (L.Layer || L.Class).extend({
             }
         }
         this.pause();
-        this._interp = new Interpolator(this._transitionTime);
+        this._interp = new LtdInterpolator(this._transitionTime);
         this._timeDimension.nextTime(this._steps, this._loop, this._interp);
         if (buffer > 0) {
             this._timeDimension.prepareNextTimes(this._steps, buffer, this._loop);

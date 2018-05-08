@@ -63,7 +63,7 @@ L.TimeDimension = (L.Layer || L.Class).extend({
     },
 
     setCurrentTimeIndex: function (newIndex,interp) {
-        this._interp = interp;
+        this._interp = interp || {position: function(){return 1;}};
         var upperLimit = this._upperLimit || this._availableTimes.length - 1;
         var lowerLimit = this._lowerLimit || 0;
         //clamp the value
