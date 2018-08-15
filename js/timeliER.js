@@ -116,22 +116,6 @@ var timeliER = function(elid,erddap){
    }
 
 
-  /*
-  var conn3VelocityLayer = L.tileLayer.wms( "http://erddap3.marine.ie/erddap/wms/"+dataset+"/request", {
-      layers: dataset+':vectors[sea_water_x_velocity|sea_water_y_velocity]',
-      format: 'image/png',
-      transparent: true,
-      crs: L.CRS.EPSG4326,
-      erddap:{
-          url: erddap,
-          dataset: dataset,
-          attributes: ['sea_water_x_velocity','sea_water_y_velocity'],
-          vertical: "20.0"
-      },
-  });
-  */
-
-
   var addTimeDimensionLayer = function(layer, name, addToMap){
       var timeDimensionLayer = L.timeDimension.layer.wms(layer, {cache: 15, fadeFrames: 10, interpolate: true});
       //layersControl.addOverlay(timeDimensionLayer, name);
